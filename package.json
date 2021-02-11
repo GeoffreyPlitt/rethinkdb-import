@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "es6-promise-series": "^0.2.2",
+    "lodash": "^4.17.20",
+    "rethinkdbdash": "^2.3.31"
+  }
+}
