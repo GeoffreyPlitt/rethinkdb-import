@@ -1,6 +1,7 @@
 #rethinkdb-dumps
 
 [rethinkdb_dump]*
+.DS_Store
 
 # Logs
 logs
