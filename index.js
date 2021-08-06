@@ -7,50 +7,55 @@ const StreamArray = require('stream-json/streamers/StreamArray');
 const { Writable } = require('stream');
 // ------------------------------- HELPERS -------------------------------------
 
-const handle_table = async (db_folder, table_file) => {
+const chunkData = (data) => {
+  return data.reduce((arr, item, index) => {
+    const chunkIndex = Math.floor(index / 100);
+    if (!arr[chunkIndex]) {
+      arr[chunkIndex] = []; // new chunk
+    }
+    arr[chunkIndex].push(item);
+    return arr;
+  }, []);
+};
+
+const handle_table = async (db_folder, table_file, tableList) => {
   const db_name = _.last(db_folder.split('/'));
   const table_name = _.last(table_file.split('/')).split('.')[0];
   console.log(`   Importing table ${table_file}...`);
 
-  await r.db(db_name).tableCreate(table_name).run(); // create table
-
-  let jsonData = [];
+  if (!tableList.includes(table_name)) {
+    await r.db(db_name).tableCreate(table_name).run(); // create table
+  }
 
   const fileStream = fs.createReadStream(table_file);
   const jsonStream = StreamArray.withParser();
 
-  const processingStream = new Writable({
-    write({ key, value }, encoding, callback) {
-      if (jsonData.length === 99) {
-        r.db(db_name)
-          .table(table_name)
-          .insert(jsonData)
-          .run()
-          .then(() => {
-            jsonData = [];
-          });
-      }
-      jsonData.push(value);
-      callback();
-    },
-    objectMode: true,
-  });
+  const jsonData = [];
   fileStream.pipe(jsonStream.input);
-  jsonStream.pipe(processingStream);
-
-  processingStream.on('finish', () => {
-    r.db(db_name).table(table_name).insert(jsonData).run();
+  jsonStream.on('data', ({ value }) => {
+    jsonData.push(value);
+  });
+  jsonStream.on('end', async () => {
+    if (jsonData.length <= 100) {
+      await r.db(db_name).table(table_name).insert(jsonData);
+    } else {
+      const chunked = chunkData(jsonData);
+      for (const chunk of chunked) {
+        await r.db(db_name).table(table_name).insert(chunk);
+      }
+    }
   });
 };
 
 const handle_db = async (db_folder) => {
   console.log(`Importing database ${db_folder}...`);
   const db_name = _.last(db_folder.split('/'));
-  await r.dbDrop(db_name);
-  await r.dbCreate(db_name);
+  const tableList = await r.db(db_name).tableList().run();
   const file_names = (await fs.promises.readdir(db_folder)).filter((x) => _.endsWith(x, '.json'));
   const table_files = file_names.map((file_name) => path.join(db_folder, file_name));
-  await series(table_files.map((table_file) => () => handle_table(db_folder, table_file)));
+  await series(
+    table_files.map((table_file) => () => handle_table(db_folder, table_file, tableList))
+  );
 };
 
 // --------------------------------- MAIN --------------------------------------
