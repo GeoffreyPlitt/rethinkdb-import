@@ -2,6 +2,8 @@
   "dependencies": {
     "es6-promise-series": "^0.2.2",
     "lodash": "^4.17.20",
-    "rethinkdbdash": "^2.3.31"
+    "rethinkdbdash": "^2.3.31",
+    "stream": "0.0.2",
+    "stream-json": "^1.7.2"
   }
 }
