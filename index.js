@@ -39,6 +39,9 @@ const handle_table = async (db_folder, table_file, table_list) => {
       jsonData.push(value);
     });
     jsonStream.on('end', async () => {
+      console.log('Waiting for tables to be ready...');
+      await r.db(db_name).wait();
+      console.log('Writing data...');
       if (jsonData.length <= 100) {
         await r.db(db_name).table(table_name).insert(jsonData).run();
       } else {
@@ -47,6 +50,7 @@ const handle_table = async (db_folder, table_file, table_list) => {
           await r.db(db_name).table(table_name).insert(chunk).run();
         }
       }
+      console.log('Finished writing ');
       resolve();
     });
   });
